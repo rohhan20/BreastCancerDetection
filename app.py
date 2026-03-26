@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 st.set_page_config(
-    page_title="Breast Cancer ML vs Doctor Demo",
+    page_title="Breast Cancer ML vs Simple Heuristics",
     page_icon="🩺",
     layout="wide",
 )
@@ -263,7 +263,7 @@ def main() -> None:
         st.metric("Estimated risk", risk_from_prob(prob_benign))
 
     with right:
-        st.subheader("Doctor-style baseline")
+        st.subheader("Simple heuristic style baseline")
         st.metric("Prediction", label_from_target(doc_pred))
         st.write(DOCTOR_RULE_TEXT)
         checks = pd.DataFrame(
@@ -337,7 +337,6 @@ def main() -> None:
             - The rule-based baseline mimics a simple clinician-style heuristic.
             - The ML model learns from all 30 measurements at once.
             - Even with a simple logistic regression model, performance on the held-out test set is much stronger.
-            - The goal is **decision support**, not replacing doctors.
             """
         )
 
