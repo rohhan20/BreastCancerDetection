@@ -209,7 +209,7 @@ def main() -> None:
 
     initialize_inputs(editable_features, medians)
 
-    st.title("🩺 Breast Cancer Detection Demo: ML vs Doctor-style Rule")
+    st.title("🩺 Breast Cancer Detection Demo: ML vs Simple Heuristics")
     st.caption(
         "Demo only — not for medical use. This app compares a simple rule-based baseline with a logistic regression model."
     )
