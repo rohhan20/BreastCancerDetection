@@ -23,6 +23,29 @@ DOCTOR_RULE_TEXT = (
     "Otherwise predict **benign**."
 )
 
+DOCTOR_RULE_FEATURES = [
+    "worst concave points",
+    "worst perimeter",
+    "mean radius",
+]
+
+
+def make_profile_library(
+    X_test: pd.DataFrame, y_test: pd.Series
+) -> dict[str, pd.Series]:
+    profile_library: dict[str, pd.Series] = {}
+
+    benign_indices = y_test[y_test == 1].index[:5]
+    malignant_indices = y_test[y_test == 0].index[:5]
+
+    for i, idx in enumerate(benign_indices, start=1):
+        profile_library[f"Benign profile {i}"] = X_test.loc[idx].copy()
+
+    for i, idx in enumerate(malignant_indices, start=1):
+        profile_library[f"Malignant profile {i}"] = X_test.loc[idx].copy()
+
+    return profile_library
+
 
 @st.cache_data
 def load_demo_objects():
@@ -47,6 +70,10 @@ def load_demo_objects():
 
     coef = pd.Series(model.named_steps["clf"].coef_[0], index=X.columns)
     top_features = coef.abs().sort_values(ascending=False).head(10).index.tolist()
+    editable_features = top_features.copy()
+    for feature in DOCTOR_RULE_FEATURES:
+        if feature not in editable_features:
+            editable_features.append(feature)
 
     feature_medians = X_train.median()
     feature_ranges = pd.DataFrame(
@@ -57,8 +84,9 @@ def load_demo_objects():
         }
     )
 
-    benign_example = X_test.loc[y_test[y_test == 1].index[0]].copy()
-    malignant_example = X_test.loc[y_test[y_test == 0].index[0]].copy()
+    profile_library = make_profile_library(X_test, y_test)
+    benign_example = profile_library["Benign profile 1"].copy()
+    malignant_example = profile_library["Malignant profile 1"].copy()
 
     doctor_pred_test = doctor_rule_batch(X_test)
 
@@ -96,8 +124,10 @@ def load_demo_objects():
         "y_prob": y_prob,
         "coef": coef,
         "top_features": top_features,
+        "editable_features": editable_features,
         "feature_medians": feature_medians,
         "feature_ranges": feature_ranges,
+        "profile_library": profile_library,
         "benign_example": benign_example,
         "malignant_example": malignant_example,
         "metrics": metrics,
@@ -162,6 +192,12 @@ def initialize_inputs(editable_features: list[str], medians: pd.Series) -> None:
 
 
 
+def initialize_profile_picker(profile_names: list[str]) -> None:
+    if "selected_profile_name" not in st.session_state:
+        st.session_state["selected_profile_name"] = profile_names[0]
+
+
+
 def build_patient_row(
     editable_features: list[str], medians: pd.Series
 ) -> pd.Series:
@@ -203,11 +239,14 @@ def main() -> None:
     model = objs["model"]
     X_train = objs["X_train"]
     coef = objs["coef"]
-    editable_features = objs["top_features"]
+    editable_features = objs["editable_features"]
     medians = objs["feature_medians"]
     feature_ranges = objs["feature_ranges"]
+    profile_library = objs["profile_library"]
+    profile_names = list(profile_library.keys())
 
     initialize_inputs(editable_features, medians)
+    initialize_profile_picker(profile_names)
 
     st.title("🩺 Breast Cancer Detection Demo: ML vs Simple Heuristics")
     st.caption(
@@ -216,18 +255,24 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Patient input")
-        st.write("Choose a preset or edit the top 10 model features.")
+        st.write(
+            "Choose one of 10 preset patient profiles or edit the most influential "
+            "model features plus all rule-based baseline inputs."
+        )
 
-        c1, c2, c3 = st.columns(3)
+        selected_profile_name = st.selectbox(
+            "Preset patient profiles",
+            options=profile_names,
+            key="selected_profile_name",
+        )
+
+        c1, c2 = st.columns(2)
         with c1:
+            if st.button("Load profile"):
+                set_profile(profile_library[selected_profile_name], editable_features)
+        with c2:
             if st.button("Median"):
                 set_profile(medians, editable_features)
-        with c2:
-            if st.button("Benign ex"):
-                set_profile(objs["benign_example"], editable_features)
-        with c3:
-            if st.button("Malignant ex"):
-                set_profile(objs["malignant_example"], editable_features)
 
         st.markdown("---")
         st.markdown("**Editable features**")
@@ -246,7 +291,7 @@ def main() -> None:
             )
 
         st.info(
-            "The remaining 20 features stay fixed at training-set median values to keep the UI simple."
+            "The remaining features stay fixed at training-set median values to keep the UI simple."
         )
 
     patient = build_patient_row(editable_features, medians)
@@ -259,7 +304,8 @@ def main() -> None:
     with left:
         st.subheader("ML prediction")
         st.metric("Prediction", label_from_target(ml_pred))
-        st.metric("P(benign)", f"{prob_benign:.1%}")
+        st.metric("P(benign)", f"{prob_benign:.3%}")
+        st.metric("P(malignant)", f"{1 - prob_benign:.3%}")
         st.metric("Estimated risk", risk_from_prob(prob_benign))
 
     with right:
@@ -334,7 +380,7 @@ def main() -> None:
     with st.expander("Presentation talking points"):
         st.markdown(
             """
-            - The rule-based baseline mimics a simple clinician-style heuristic.
+            - The rule-based baseline mimics a simple heuristic based predicion.
             - The ML model learns from all 30 measurements at once.
             - Even with a simple logistic regression model, performance on the held-out test set is much stronger.
             """
