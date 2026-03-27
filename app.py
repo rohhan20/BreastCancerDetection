@@ -331,7 +331,7 @@ def main() -> None:
     if ml_pred == doc_pred:
         st.success("Both approaches agree on this patient.")
     else:
-        st.warning("The ML model and the doctor-style rule disagree for this patient.")
+        st.warning("The ML model and the heuristics style rule disagree for this patient.")
 
     st.markdown("---")
     st.subheader("What is driving the ML prediction?")
@@ -353,7 +353,7 @@ def main() -> None:
 
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**Doctor-style rule confusion matrix**")
+        st.markdown("**Heuristic rule confusion matrix**")
         st.dataframe(format_confusion(objs["cm_doctor"]), use_container_width=True)
     with c2:
         st.markdown("**ML confusion matrix**")
